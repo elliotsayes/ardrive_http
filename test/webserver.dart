@@ -33,7 +33,7 @@ const Map<String, Object> headers = {
   'allow': '*',
 };
 
-Future<void> main() async {
+Future<void> runServer() async {
   Router router = Router();
 
   final server = await shelf_io.serve(

@@ -16,6 +16,10 @@ void main() {
     noLogs: true,
   );
 
+  setUpAll(() async {
+    await runServer();
+  });
+
   tearDownAll(() => http.get(url: '$baseUrl/exit'));
 
   group('ArDriveHTTP', () {
