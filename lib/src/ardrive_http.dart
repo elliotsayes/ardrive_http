@@ -60,6 +60,14 @@ class ArDriveHTTP {
     getIOParams['url'] = url;
     getIOParams['responseType'] = responseType;
 
+    // On native: Attempting to get the stream from an isolate throws an error
+    // TODO: find a way to stream this within the isolate
+    // On Web: Stream with JS is incomplete
+    // TODO: find a way to safely stream data from JS to Dart
+    if (responseType == ResponseType.stream) {
+      return await _getIO(getIOParams);
+    }
+
     if (kIsWeb) {
       if (await _loadWebWorkers()) {
         return await _getWeb(
@@ -82,6 +90,10 @@ class ArDriveHTTP {
     return get(url: url, responseType: ResponseType.bytes);
   }
 
+  Future<ArDriveHTTPResponse> getAsByteStream(String url) async {
+    return get(url: url, responseType: ResponseType.stream);
+  }
+
   Future<ArDriveHTTPResponse> _getIO(Map params) async {
     final String url = params['url'];
     final ResponseType responseType = params['responseType'];
@@ -96,12 +108,22 @@ class ArDriveHTTP {
             const Duration(seconds: 8), // 8s timeout
           );
 
-      return ArDriveHTTPResponse(
-        data: response.data,
-        statusCode: response.statusCode,
-        statusMessage: response.statusMessage,
-        retryAttempts: retryAttempts,
-      );
+      if (responseType == ResponseType.stream) {
+        return ArDriveHTTPResponse(
+          data: (response.data as ResponseBody).stream,
+          statusCode: response.statusCode,
+          statusMessage: response.statusMessage,
+          retryAttempts: retryAttempts,
+        );
+      } else {
+        return ArDriveHTTPResponse(
+          data: response.data,
+          statusCode: response.statusCode,
+          statusMessage: response.statusMessage,
+          retryAttempts: retryAttempts,
+        );
+      }
+      
     } catch (error) {
       throw ArDriveHTTPException(
         retryAttempts: retryAttempts,
