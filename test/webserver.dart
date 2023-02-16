@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
@@ -53,11 +54,18 @@ Future<void> main() async {
     ),
   );
 
+  Stream<Uint8List> slowOk() async* {
+    yield Uint8List.fromList(utf8.encode('o'));
+    await Future<void>.delayed(const Duration(seconds: 10));
+    yield Uint8List.fromList(utf8.encode('k'));
+  }
+
   router.all(
     '/ok',
     (Request request) => Response.ok(
-      'ok',
+      slowOk(),
       headers: headers,
+      context: {"shelf.io.buffer_output": false},
     ),
   );
 
