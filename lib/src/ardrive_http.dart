@@ -93,50 +93,40 @@ class ArDriveHTTP {
   }
 
   Future<ArDriveHTTPResponse> getAsByteStream(String url, {Completer<String>? cancelWithReason}) async {
-    return kIsWeb 
-      ? _getAsByteStreamWeb(url, cancelWithReason: cancelWithReason)
-      : _getAsByteStreamIO(url, cancelWithReason: cancelWithReason);
-  }
+    final http.Client client;
+    if (kIsWeb) {
+      client = fetch.FetchClient(mode: fetch.RequestMode.cors);
+    } else {
+      client = http_cancel.Client() as http.Client;
+    }
 
-  Future<ArDriveHTTPResponse> _getAsByteStreamWeb(String url, {Completer<String>? cancelWithReason}) async {
-    final client = fetch.FetchClient(mode: fetch.RequestMode.cors);
-    
-    final response = await client.send(
-      http.Request(
-        'GET', 
-        Uri.parse(url),
-      ),
-    );
-    
-    cancelWithReason?.future.then((value) {
-      debugPrint('Cancelling request to $url with reason: $value');
-      response.cancel();
-    });
-    
-    final byteStream = response.stream.map((event) => Uint8List.fromList(event));
-    return ArDriveHTTPResponse(
-      data: byteStream,
-      statusCode: response.statusCode,
-      statusMessage: response.reasonPhrase,
-      retryAttempts: retryAttempts,
-    );
-  }
-
-  Future<ArDriveHTTPResponse> _getAsByteStreamIO(String url, {Completer<String>? cancelWithReason}) async {
-    final client = http_cancel.Client();
     final cancellationToken = http_cancel.CancellationToken();
-
-    final response = await client.send(
-      http_cancel.Request(
-        'GET', 
-        Uri.parse(url),
-      ),
-      cancellationToken: cancellationToken,
-    );
     
+    final http.StreamedResponse response;
+    if (kIsWeb) {
+      response = await (client as fetch.FetchClient).send(
+        http.Request(
+          'GET', 
+          Uri.parse(url),
+        ),
+      );
+    } else {
+      response = (await (client as http_cancel.Client).send(
+        http_cancel.Request(
+          'GET', 
+          Uri.parse(url),
+        ),
+        cancellationToken: cancellationToken,
+      )) as http.StreamedResponse;
+    }
+
     cancelWithReason?.future.then((value) {
       debugPrint('Cancelling request to $url with reason: $value');
-      cancellationToken.cancel();
+      if (kIsWeb) {
+        (response as fetch.FetchResponse).cancel();
+      } else {
+        cancellationToken.cancel();
+      }
     });
     
     final byteStream = response.stream.map((event) => Uint8List.fromList(event));
